@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>insertPending — Animated Explainer</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #09111a;
+  --surface:   #0e1d2b;
+  --surface2:  #152534;
+  --border:    #1e3a50;
+  --text:      #c8dfe8;
+  --muted:     #4a6e85;
+  --accent:    #00e5a0;
+  --accent2:   #00b8ff;
+  --warm:      #ffaa44;
+  --danger:    #ff5566;
+  --purple:    #b78cff;
+
+  --cell-size: 52px;
+  --gap:       8px;
+  --radius:    12px;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-ui:   'Space Grotesk', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+/* ── SCANLINE OVERLAY ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ── HEADER ── */
+.header {
+  width: 100%;
+  background: linear-gradient(90deg, #09111a 0%, #0e2035 50%, #09111a 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 18px 32px 14px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.header-badge {
+  background: var(--accent);
+  color: #09111a;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .15em;
+  padding: 4px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+.header h1 {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: .04em;
+}
+.header h1 span { color: var(--accent); font-weight: 700; }
+.header-right {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── MAIN STAGE ── */
+.stage {
+  width: 100%;
+  max-width: 1100px;
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── SCREEN TITLE (animated) ── */
+.screen-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--accent2);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  min-height: 20px;
+  transition: opacity .3s;
+}
+
+/* ── PANELS LAYOUT ── */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 760px) { .panels { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px 20px;
+  position: relative;
+  overflow: hidden;
+  min-height: 160px;
+}
+.panel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+  opacity: 0;
+  transition: opacity .4s;
+}
+.panel.lit::before { opacity: 1; }
+
+.panel-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.panel-label span {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ── CELL ── */
+.cell-row { display: flex; flex-wrap: wrap; gap: var(--gap); align-items: flex-end; }
+
+.cell {
+  width: var(--cell-size);
+  height: var(--cell-size);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 700;
+  border: 1.5px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  position: relative;
+  transition: background .35s, border-color .35s, color .35s, transform .3s, box-shadow .35s;
+  flex-shrink: 0;
+}
+.cell .idx {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+  position: absolute;
+  bottom: 5px;
+  letter-spacing: .05em;
+}
+
+/* States */
+.cell.main-rest  { background: var(--surface2); border-color: #1e3a50; }
+.cell.main-old   { background: #0e2437; border-color: #1e7aac; color: var(--accent2); }
+.cell.inserted   {
+  background: #0a2a1c;
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 16px rgba(0,229,160,.25);
+  animation: pop-in .35s cubic-bezier(.34,1.56,.64,1);
+}
+.cell.active-pend {
+  background: #2a1800;
+  border-color: var(--warm);
+  color: var(--warm);
+  box-shadow: 0 0 18px rgba(255,170,68,.3);
+  animation: pulse-warm 1s ease-in-out infinite;
+}
+.cell.pend-done  { background: #0d2019; border-color: #1a4a33; color: #3a8a66; }
+.cell.pend-wait  { background: var(--surface2); border-color: var(--border); color: var(--muted); }
+.cell.pos-marker {
+  border-color: var(--danger);
+  background: #200a0e;
+  color: var(--danger);
+  box-shadow: 0 0 14px rgba(255,85,102,.3);
+}
+
+@keyframes pop-in {
+  0%   { transform: scale(0) translateY(-10px); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes pulse-warm {
+  0%,100% { box-shadow: 0 0 14px rgba(255,170,68,.25); }
+  50%      { box-shadow: 0 0 28px rgba(255,170,68,.55); }
+}
+
+/* ── BINARY SEARCH VIS ── */
+.bsearch-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.bsearch-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bsearch-iter-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted);
+  min-width: 60px;
+}
+.bs-cell {
+  width: 40px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  transition: all .25s;
+  position: relative;
+}
+.bs-cell .bs-tag { font-size: 8px; font-weight: 400; color: var(--muted); }
+.bs-cell.mid-cell { background: #1a1500; border-color: var(--warm); color: var(--warm); }
+.bs-cell.mid-cell .bs-tag { color: var(--warm); }
+.bs-cell.search-zone { background: #0a1e2e; border-color: var(--accent2); color: var(--accent2); }
+
+/* ── JACOBSTHAL BATCH BAR ── */
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.batch-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  transition: all .3s;
+}
+.batch-chip.active-batch {
+  border-color: var(--accent2);
+  background: #091e2e;
+  color: var(--accent2);
+  box-shadow: 0 0 12px rgba(0,184,255,.2);
+}
+.batch-chip.done-batch { opacity: .4; }
+
+/* ── INFO PANEL ── */
+.info-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 16px 22px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.8;
+  min-height: 64px;
+}
+.info-panel .kw  { color: var(--accent2); }
+.info-panel .val { color: var(--warm); font-weight: 700; }
+.info-panel .dim { color: var(--muted); }
+.info-panel .ok  { color: var(--accent); }
+
+/* ── FINAL BANNER ── */
+.final-banner {
+  background: linear-gradient(135deg, #0a2a1c, #091e2e);
+  border: 1px solid var(--accent);
+  border-radius: 18px;
+  padding: 22px 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: all .5s;
+  pointer-events: none;
+}
+.final-banner.show { opacity: 1; transform: none; pointer-events: auto; }
+.final-banner .label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; color: var(--accent); text-transform: uppercase; margin-bottom: 8px; }
+.sorted-cells { display: flex; flex-wrap: wrap; gap: 6px; }
+.sorted-cell {
+  width: 42px; height: 42px;
+  background: #0a2a1c;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 14px; font-weight: 700;
+  color: var(--accent);
+  animation: sorted-appear .4s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+@keyframes sorted-appear {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ── PROGRESS BAR ── */
+.progress-track {
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  border-radius: 2px;
+  transition: width .4s ease;
+}
+
+/* ── CONTROLS ── */
+.controls {
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 32px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  position: sticky;
+  bottom: 0;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+.ctrl-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .15s;
+  letter-spacing: .06em;
+}
+.ctrl-btn:hover { border-color: var(--accent2); color: var(--accent2); background: #091e2e; }
+.ctrl-btn:active { transform: scale(.96); }
+.ctrl-btn.primary {
+  background: var(--accent);
+  color: #09111a;
+  border-color: var(--accent);
+  min-width: 90px;
+}
+.ctrl-btn.primary:hover { background: #00ffa8; border-color: #00ffa8; color: #09111a; }
+.ctrl-btn:disabled { opacity: .3; cursor: default; pointer-events: none; }
+
+.speed-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+.speed-group input[type=range] {
+  accent-color: var(--accent);
+  width: 90px;
+}
+.step-counter {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 70px;
+}
+
+/* ── PHASE INTRO SCREEN ── */
+.phase-intro {
+  position: fixed; inset: 0;
+  background: rgba(9,17,26,.92);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  transition: opacity .4s;
+}
+.phase-intro.hidden { opacity: 0; pointer-events: none; }
+.intro-title {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+  text-align: center;
+}
+.intro-sub {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  color: var(--muted);
+  text-align: center;
+  max-width: 460px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+.intro-input-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.intro-input-row input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  width: 320px;
+  outline: none;
+  transition: border-color .2s;
+}
+.intro-input-row input:focus { border-color: var(--accent2); }
+.intro-start {
+  background: var(--accent);
+  color: #09111a;
+  border: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  letter-spacing: .06em;
+  transition: background .15s;
+}
+.intro-start:hover { background: #00ffa8; }
+.intro-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.leg { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.leg-sq { width: 14px; height: 14px; border-radius: 4px; border: 1px solid; }
+
+/* ── PHASE TITLE ANIM ── */
+@keyframes slide-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-in { animation: slide-in .3s ease both; }
+</style>
+</head>
+<body>
+
+<!-- INTRO SCREEN -->
+<div class="phase-intro" id="intro">
+  <div class="intro-title">insertPending()</div>
+  <div class="intro-sub">
+    Animated step-by-step walkthrough of Ford-Johnson merge-insertion sort —
+    Jacobsthal batch ordering + binary search into the main chain.
+  </div>
+  <div class="intro-input-row">
+    <input type="text" id="intro-input" value="21 9 17 5 13 1 8 3 15 7 11 4" placeholder="Enter integers...">
+    <button class="intro-start" onclick="startAnimation()">▶ Start</button>
+  </div>
+  <div class="intro-legend">
+    <div class="leg"><div class="leg-sq" style="background:#0a2a1c;border-color:var(--accent)"></div>inserted</div>
+    <div class="leg"><div class="leg-sq" style="background:#2a1800;border-color:var(--warm)"></div>active (inserting now)</div>
+    <div class="leg"><div class="leg-sq" style="background:#1a1500;border-color:var(--warm)"></div>mid (binary search)</div>
+    <div class="leg"><div class="leg-sq" style="background:#0a1e2e;border-color:var(--accent2)"></div>search zone</div>
+    <div class="leg"><div class="leg-sq" style="background:#0d2019;border-color:#1a4a33"></div>pend done</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-badge">ALGO</div>
+  <h1>Sorter&lt;Container&gt;::<span>insertPending</span>  ·  Ford-Johnson merge-insertion sort</h1>
+  <div class="header-right" id="phase-label">phase: setup</div>
+</div>
+
+<!-- PROGRESS -->
+<div style="width:100%;padding:0">
+  <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+</div>
+
+<!-- STAGE -->
+<div class="stage">
+  <div class="screen-title" id="screen-title">—</div>
+
+  <!-- Setup: pairs + chains (shown before stepper) -->
+  <div id="setup-panels" class="panels" style="display:none">
+    <div class="panel" id="p-pairs">
+      <div class="panel-label"><span>sorted pairs — [larger | smaller]</span></div>
+      <div class="cell-row" id="pairs-row"></div>
+    </div>
+    <div class="panel" id="p-chains">
+      <div class="panel-label"><span>main chain  ·  pend[ ]</span></div>
+      <div class="cell-row" id="main-init-row" style="margin-bottom:10px"></div>
+      <div class="panel-label" style="margin-top:8px"><span>pend</span></div>
+      <div class="cell-row" id="pend-init-row"></div>
+    </div>
+  </div>
+
+  <!-- Jacobsthal batch bar -->
+  <div id="jac-panel" class="panel" style="display:none">
+    <div class="panel-label"><span>jacobsthal batches — jac = <span id="jac-seq-label"></span></span></div>
+    <div class="batch-bar" id="batch-bar"></div>
+  </div>
+
+  <!-- Main stepper panels -->
+  <div class="panels" id="step-panels" style="display:none">
+
+    <!-- Pend state -->
+    <div class="panel" id="p-pend">
+      <div class="panel-label"><span>pend[ ]  ·  done[ ]</span></div>
+      <div class="cell-row" id="pend-row" style="gap:10px"></div>
+    </div>
+
+    <!-- Main chain -->
+    <div class="panel lit" id="p-main">
+      <div class="panel-label"><span>main chain</span></div>
+      <div style="margin-bottom:6px">
+        <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-bottom:4px">before</div>
+        <div class="cell-row" id="main-before-row"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-bottom:4px">after</div>
+        <div class="cell-row" id="main-after-row"></div>
+      </div>
+    </div>
+
+    <!-- Binary search (full width) -->
+    <div class="panel" id="p-bsearch" style="grid-column:1/-1">
+      <div class="panel-label"><span>binary search  —  upper_bound: first pos where main[mid] &gt; value</span></div>
+      <div class="bsearch-wrap" id="bsearch-wrap"></div>
+      <div style="margin-top:10px;font-family:var(--font-mono);font-size:11px;color:var(--muted)">
+        <span id="bs-result-label"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info line -->
+  <div class="info-panel" id="info-panel"></div>
+
+  <!-- Final sorted -->
+  <div class="final-banner" id="final-banner">
+    <div>
+      <div class="label">✓ sorted result</div>
+      <div class="sorted-cells" id="sorted-cells"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <button class="ctrl-btn" id="btn-prev" onclick="navigate(-1)" disabled>◀ Prev</button>
+  <button class="ctrl-btn primary" id="btn-play" onclick="togglePlay()">▶ Play</button>
+  <button class="ctrl-btn" id="btn-next" onclick="navigate(1)">Next ▶</button>
+  <div class="step-counter" id="step-counter">0 / 0</div>
+  <div class="speed-group">
+    speed
+    <input type="range" id="speed-slider" min="300" max="3000" value="1400" step="100" oninput="updateSpeed(this.value)">
+    <span id="speed-label">1.4 s</span>
+  </div>
+</div>
+
+<script>
+// ── Algorithm (matches C++ exactly) ──────────────────────────────────────
+
+function jacobsthal(upTo) {
+  const j = [0, 1];
+  while (j[j.length - 1] < upTo)
+    j.push(j[j.length - 1] + 2 * j[j.length - 2]);
+  return j;
+}
+
+function binaryInsertSteps(arr, v) {
+  let lo = 0, hi = arr.length;
+  const steps = [];
+  const a = [...arr];
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    steps.push({ lo, hi, mid, arr: [...a] });
+    if (a[mid] <= v) lo = mid + 1; else hi = mid;
+  }
+  steps.push({ lo, hi, mid: -1, arr: [...a], final: true, insertAt: lo });
+  a.splice(lo, 0, v);
+  return { result: a, steps, insertAt: lo };
+}
+
+function buildSimulation(nums) {
+  let c = [...nums];
+  let straggler = null;
+  if (c.length % 2 === 1) straggler = c.pop();
+
+  // pairs: (larger=first, smaller=second) → matches C++ .first/.second
+  const pairs = [];
+  for (let i = 0; i < c.length; i += 2) {
+    const a = c[i], b = c[i + 1];
+    pairs.push(a > b ? { lg: a, sm: b } : { lg: b, sm: a });
+  }
+  // sortPairsByLarger — C++ uses strict < (stable)
+  for (let i = 1; i < pairs.length; i++) {
+    const key = pairs[i]; let lo = 0, hi = i;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (pairs[mid].lg < key.lg) lo = mid + 1; else hi = mid; }
+    pairs.splice(i, 1); pairs.splice(lo, 0, key);
+  }
+
+  const main = [pairs[0].sm, ...pairs.map(p => p.lg)];
+  const pend = pairs.slice(1).map(p => p.sm);
+  const jac  = jacobsthal(pend.length);
+
+  const frames = [];
+  const doneFlags = new Array(pend.length).fill(false);
+  let workingMain = [...main];
+
+  for (let k = 2; k < jac.length; k++) {
+    let hi = jac[k], lo = jac[k - 1];
+    if (hi > pend.length) hi = pend.length;
+    for (let i = hi; i > lo; i--) {
+      const idx = i - 1;
+      if (idx >= pend.length || doneFlags[idx]) continue;
+      const mainBefore = [...workingMain];
+      const doneBefore = [...doneFlags];
+      const { result, steps, insertAt } = binaryInsertSteps(workingMain, pend[idx]);
+      workingMain = result;
+      doneFlags[idx] = true;
+      frames.push({
+        batchK: k, batchLo: lo, batchHi: hi,
+        pendIdx: idx, value: pend[idx],
+        bsearch: steps, insertAt,
+        mainBefore, mainAfter: [...workingMain],
+        doneFlags: [...doneFlags], doneBefore,
+        safety: false
+      });
+    }
+  }
+  // safety net
+  for (let i = 0; i < pend.length; i++) {
+    if (!doneFlags[i]) {
+      const mainBefore = [...workingMain];
+      const doneBefore = [...doneFlags];
+      const { result, steps, insertAt } = binaryInsertSteps(workingMain, pend[i]);
+      workingMain = result;
+      doneFlags[i] = true;
+      frames.push({
+        batchK: -1, batchLo: -1, batchHi: -1,
+        pendIdx: i, value: pend[i],
+        bsearch: steps, insertAt,
+        mainBefore, mainAfter: [...workingMain],
+        doneFlags: [...doneFlags], doneBefore,
+        safety: true
+      });
+    }
+  }
+  if (straggler !== null) {
+    const { result } = binaryInsertSteps(workingMain, straggler);
+    workingMain = result;
+  }
+
+  return { pairs, main, pend, jac, frames, finalSorted: workingMain, straggler };
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+
+let sim = null;
+let cur = -1;       // -1 = setup, 0..n-1 = frames
+let playing = false;
+let playTimer = null;
+let stepDelay = 1400;
+const SETUP_FRAMES = 2; // synthetic frames: 0=pairs, 1=chains
+
+// total "positions" = SETUP_FRAMES + sim.frames.length
+function totalPos() { return sim ? SETUP_FRAMES + sim.frames.length : 0; }
+function curPos()   { return cur + 1; }  // 1-indexed
+
+// ── Render helpers ────────────────────────────────────────────────────────
+
+function cellHtml(v, cls, idx = null, title = '') {
+  const idxEl = idx !== null ? `<span class="idx">[${idx}]</span>` : '';
+  return `<div class="cell ${cls}" title="${title}">${v}${idxEl}</div>`;
+}
+
+function renderSetupPairs() {
+  document.getElementById('screen-title').textContent = 'phase 1 — pair & sort by larger element';
+  document.getElementById('phase-label').textContent = 'phase: setup — pairs';
+  document.getElementById('setup-panels').style.display = 'grid';
+  document.getElementById('jac-panel').style.display = 'none';
+  document.getElementById('step-panels').style.display = 'none';
+  document.getElementById('final-banner').classList.remove('show');
+  document.getElementById('p-pairs').classList.add('lit');
+  document.getElementById('p-chains').classList.remove('lit');
+
+  const row = document.getElementById('pairs-row');
+  row.innerHTML = '';
+  sim.pairs.forEach((p, i) => {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px';
+    wrap.innerHTML = `<div style="display:flex;gap:4px">${cellHtml(p.lg, 'main-old')}${cellHtml(p.sm, '')}</div>
+      <div style="font-size:9px;font-family:var(--font-mono);color:var(--muted)">pair[${i}]</div>`;
+    row.appendChild(wrap);
+  });
+
+  setInfo(`<span class="kw">buildPairs()</span> + <span class="kw">sortPairsByLarger()</span>
+  — each pair: <span class="val">larger</span> (blue) paired with <span class="dim">smaller</span>.
+  Sorted ascending by larger element using binary insertion (strict <code>&lt;</code> → stable).`);
+}
+
+function renderSetupChains() {
+  document.getElementById('screen-title').textContent = 'phase 2 — build main chain & pend';
+  document.getElementById('phase-label').textContent = 'phase: setup — main chain & pend';
+  document.getElementById('setup-panels').style.display = 'grid';
+  document.getElementById('jac-panel').style.display = 'block';
+  document.getElementById('p-chains').classList.add('lit');
+  document.getElementById('p-pairs').classList.remove('lit');
+
+  const mainRow = document.getElementById('main-init-row');
+  mainRow.innerHTML = sim.main.map(v => cellHtml(v, 'main-old')).join('');
+
+  const pendRow = document.getElementById('pend-init-row');
+  pendRow.innerHTML = sim.pend.map((v, i) => cellHtml(v, 'pend-wait', i)).join('');
+
+  // Jacobsthal bar
+  document.getElementById('jac-seq-label').textContent = `[${sim.jac.join(', ')}]`;
+  const bar = document.getElementById('batch-bar');
+  bar.innerHTML = '';
+  for (let k = 2; k < sim.jac.length; k++) {
+    let hi = Math.min(sim.jac[k], sim.pend.length), lo = sim.jac[k - 1];
+    const idxs = [];
+    for (let i = hi; i > lo; i--) if (i - 1 < sim.pend.length) idxs.push(i - 1);
+    if (!idxs.length) continue;
+    const chip = document.createElement('div');
+    chip.className = 'batch-chip';
+    chip.id = `batch-k${k}`;
+    chip.textContent = `k=${k} → pend[${idxs.join(',')}]`;
+    bar.appendChild(chip);
+  }
+
+  setInfo(`<span class="kw">buildMainChain()</span>: main = [pairs[0].smaller, pairs[0].larger…pairs[n-1].larger] = <span class="val">${sim.main.join(', ')}</span>
+  <br><span class="kw">buildPend()</span>: pend = pairs[1..n-1].smaller = <span class="val">[${sim.pend.join(', ')}]</span>
+  <br><span class="kw">jacobsthal(${sim.pend.length})</span> = [${sim.jac.join(', ')}] — defines insertion batch order`);
+}
+
+function renderFrame(fi) {
+  const f = sim.frames[fi];
+  document.getElementById('setup-panels').style.display = 'none';
+  document.getElementById('step-panels').style.display = 'grid';
+  document.getElementById('final-banner').classList.remove('show');
+
+  // batch label
+  const bLabel = f.safety
+    ? `phase: safety net — pend[${f.pendIdx}]`
+    : `phase: k=${f.batchK} batch — i=${f.pendIdx + 1}, idx=${f.pendIdx}`;
+  document.getElementById('phase-label').textContent = bLabel;
+  document.getElementById('screen-title').textContent =
+    f.safety
+      ? `safety net: insert pend[${f.pendIdx}] = ${f.value}`
+      : `batch k=${f.batchK}  ·  insert pend[${f.pendIdx}] = ${f.value}  into main chain`;
+
+  // highlight active batch chip
+  document.querySelectorAll('.batch-chip').forEach(c => {
+    c.classList.remove('active-batch');
+    const k = parseInt(c.id.replace('batch-k', ''));
+    if (k === f.batchK) c.classList.add('active-batch');
+    // mark done batches
+    if (fi > 0) {
+      const prevBatch = sim.frames.slice(0, fi).map(x => x.batchK);
+      if (prevBatch.every(b => b !== k) === false && k !== f.batchK) c.classList.add('done-batch');
+    }
+  });
+
+  // Pend row
+  const pendRow = document.getElementById('pend-row');
+  pendRow.innerHTML = '';
+  sim.pend.forEach((v, pi) => {
+    const isDone = f.doneBefore[pi];
+    const isActive = pi === f.pendIdx;
+    const cls = isActive ? 'active-pend' : isDone ? 'pend-done' : 'pend-wait';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:4px;position:relative';
+    wrap.innerHTML = cellHtml(v, cls) +
+      `<div style="font-size:9px;font-family:var(--font-mono);color:${isDone ? 'var(--accent)' : isActive ? 'var(--warm)' : 'var(--muted)'}">
+        [${pi}] ${isDone ? '✓' : isActive ? '←' : ''}
+      </div>`;
+    pendRow.appendChild(wrap);
+  });
+
+  // Main before
+  const beforeRow = document.getElementById('main-before-row');
+  beforeRow.innerHTML = f.mainBefore.map(v => cellHtml(v, 'main-old')).join('');
+
+  // Main after
+  const afterRow = document.getElementById('main-after-row');
+  afterRow.innerHTML = f.mainAfter.map((v, mi) => {
+    const cls = mi === f.insertAt ? 'inserted' : 'main-old';
+    return cellHtml(v, cls);
+  }).join('');
+
+  // Binary search
+  const wrap = document.getElementById('bsearch-wrap');
+  wrap.innerHTML = '';
+  const bsSteps = f.bsearch.filter(b => !b.final);
+  const shown = bsSteps.slice(0, 5);
+
+  shown.forEach((b, bi) => {
+    const row = document.createElement('div');
+    row.className = 'bsearch-row';
+    const lbl = document.createElement('div');
+    lbl.className = 'bsearch-iter-label';
+    lbl.innerHTML = `iter ${bi + 1}<br><span style="color:var(--accent2)">lo=${b.lo}</span> <span style="color:var(--warm)">hi=${b.hi}</span>`;
+    row.appendChild(lbl);
+
+    b.arr.forEach((v, vi) => {
+      const isMid = vi === b.mid;
+      const inZone = vi >= b.lo && vi < b.hi;
+      const cls = isMid ? 'mid-cell' : inZone ? 'search-zone' : '';
+      const cell = document.createElement('div');
+      cell.className = `bs-cell ${cls}`;
+      cell.innerHTML = `${v}<div class="bs-tag">${isMid ? 'mid' : ''}</div>`;
+      row.appendChild(cell);
+    });
+    wrap.appendChild(row);
+  });
+
+  if (bsSteps.length > 5) {
+    const more = document.createElement('div');
+    more.style.cssText = 'font-size:10px;color:var(--muted);font-family:var(--font-mono);padding:2px 0';
+    more.textContent = `... ${bsSteps.length - 5} more iterations`;
+    wrap.appendChild(more);
+  }
+  if (!bsSteps.length) {
+    wrap.innerHTML = `<div style="font-size:11px;font-family:var(--font-mono);color:var(--muted)">Immediate insert (lo=hi=0 → insert at position 0)</div>`;
+  }
+
+  document.getElementById('bs-result-label').innerHTML =
+    `<span class="kw">insert</span>(main, <span class="val">${f.value}</span>) → position <span style="color:var(--accent)">${f.insertAt}</span>  (upper_bound search: main[mid]≤${f.value} → lo=mid+1)`;
+
+  // Info
+  const loopDesc = f.safety
+    ? `<span class="kw">safety_net</span>: pend[<span class="val">${f.pendIdx}</span>] was not covered by Jacobsthal walk`
+    : `<span class="kw">for</span>(i=<span class="val">${f.pendIdx + 1}</span>; i&gt;lo=${f.batchLo}; i--) → idx=i-1=<span class="val">${f.pendIdx}</span>
+     | done[${f.pendIdx}]=false → <span class="kw">insert</span>(main, pend[<span class="val">${f.pendIdx}</span>]=<span class="val">${f.value}</span>)`;
+
+  setInfo(loopDesc + `<br><span class="dim">remaining pend not yet inserted: [${sim.pend.filter((_, i) => !f.doneFlags[i]).join(', ')}]</span>`);
+
+  // Final frame
+  if (fi === sim.frames.length - 1) {
+    setTimeout(() => showFinal(), stepDelay * 0.5);
+  }
+}
+
+function showFinal() {
+  const banner = document.getElementById('final-banner');
+  banner.classList.add('show');
+  const cells = document.getElementById('sorted-cells');
+  cells.innerHTML = '';
+  sim.finalSorted.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'sorted-cell';
+    d.style.animationDelay = `${i * 40}ms`;
+    d.textContent = v;
+    cells.appendChild(d);
+  });
+}
+
+function setInfo(html) {
+  const el = document.getElementById('info-panel');
+  el.classList.remove('anim-in');
+  void el.offsetWidth;
+  el.classList.add('anim-in');
+  el.innerHTML = html;
+}
+
+// ── Navigation ────────────────────────────────────────────────────────────
+
+function goTo(pos) {
+  // pos: -1=nothing, 0=setup-pairs, 1=setup-chains, 2+=(frame pos-2)
+  cur = pos;
+  const total = totalPos();
+  document.getElementById('step-counter').textContent = `${Math.max(0, pos + 1)} / ${total}`;
+  document.getElementById('progress-fill').style.width = `${total ? ((pos + 1) / total) * 100 : 0}%`;
+  document.getElementById('btn-prev').disabled = pos <= 0;
+  document.getElementById('btn-next').disabled = pos >= total - 1;
+
+  if (pos === 0) renderSetupPairs();
+  else if (pos === 1) renderSetupChains();
+  else if (pos >= SETUP_FRAMES) renderFrame(pos - SETUP_FRAMES);
+}
+
+function navigate(d) {
+  const next = Math.max(0, Math.min(totalPos() - 1, cur + d));
+  goTo(next);
+}
+
+// ── Play / Pause ──────────────────────────────────────────────────────────
+
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('btn-play').textContent = playing ? '⏸ Pause' : '▶ Play';
+  if (playing) advancePlay();
+  else clearTimeout(playTimer);
+}
+
+function advancePlay() {
+  if (!playing) return;
+  if (cur >= totalPos() - 1) {
+    playing = false;
+    document.getElementById('btn-play').textContent = '▶ Play';
+    return;
+  }
+  navigate(1);
+  playTimer = setTimeout(advancePlay, stepDelay);
+}
+
+function updateSpeed(v) {
+  stepDelay = parseInt(v);
+  document.getElementById('speed-label').textContent = (stepDelay / 1000).toFixed(1) + ' s';
+  if (playing) { clearTimeout(playTimer); advancePlay(); }
+}
+
+// ── Entry ─────────────────────────────────────────────────────────────────
+
+function startAnimation() {
+  const raw = document.getElementById('intro-input').value
+    .trim().split(/\s+/).map(Number).filter(n => !isNaN(n));
+  if (raw.length < 2) { alert('Please enter at least 2 integers.'); return; }
+
+  sim = buildSimulation(raw);
+
+  document.getElementById('intro').classList.add('hidden');
+  setTimeout(() => { document.getElementById('intro').style.display = 'none'; }, 400);
+
+  goTo(0);
+}
+
+// Allow pressing Enter on input
+document.getElementById('intro-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startAnimation();
+});
+</script>
+</body>
+</html>
